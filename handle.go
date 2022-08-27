@@ -12,9 +12,27 @@ import (
 )
 
 type Handle struct {
+	id          int
 	AppKey      string
 	AppSecret   string
 	accessToken string
+}
+
+var AllHandle []*Handle
+
+// NewHandle 创建动作执行器
+func NewHandle(appKey string, appSecret string) *Handle {
+	var h Handle
+	h.id = len(AllHandle)
+	h.AppKey = appKey
+	h.AppSecret = appSecret
+	AllHandle = append(AllHandle, &h)
+	return &h
+}
+
+// GetID 获取当前命令执行器的id
+func (h Handle) GetID() int {
+	return h.id
 }
 
 // GetAccessToken 获取token
