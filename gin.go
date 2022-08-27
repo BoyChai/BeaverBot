@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/gin-gonic/gin"
+	"io"
 	"io/ioutil"
 )
 
@@ -13,10 +14,16 @@ func RunBeaverBot(port string, e *Event) {
 	g.POST("/", func(c *gin.Context) {
 		dataReader := c.Request.Body
 		bodyData, err := ioutil.ReadAll(dataReader)
+		defer func(dataReader io.ReadCloser) {
+			err := dataReader.Close()
+			if err != nil {
+				fmt.Println(err)
+			}
+		}(dataReader)
+
 		if err != nil {
 			fmt.Println(err)
 		}
-		//e.Parse(bodyData)
 		*e = init
 		err = json.Unmarshal(bodyData, &e)
 		if err != nil {

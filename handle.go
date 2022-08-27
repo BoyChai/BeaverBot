@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"github.com/tidwall/gjson"
+	"io"
 	"io/ioutil"
 	"net/http"
 )
@@ -16,7 +18,7 @@ type Handle struct {
 }
 
 // GetAccessToken 获取token
-func (h Handle) getAccessToken() (err error) {
+func (h Handle) GetAccessToken() (err error) {
 	body := make(map[string]interface{})
 	body["appKey"] = h.AppKey
 	body["appSecret"] = h.AppSecret
@@ -31,6 +33,12 @@ func (h Handle) getAccessToken() (err error) {
 		return err
 	}
 	data, err := ioutil.ReadAll(request.Body)
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			fmt.Println(err)
+		}
+	}(request.Body)
 	if err != nil {
 		return err
 	}
@@ -38,6 +46,5 @@ func (h Handle) getAccessToken() (err error) {
 		return errors.New(string(data))
 	}
 	h.accessToken = gjson.Get(string(data), "accessToken").String()
-
 	return nil
 }
