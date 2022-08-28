@@ -115,8 +115,8 @@ func (e *Event) typeAsserts(key interface{}) (interface{}, error) {
 		return *key.(*int64), nil
 	case *string:
 		return *key.(*string), nil
-	case *int32:
-		return *key.(*int32), nil
+	case *bool:
+		return *key.(*bool), nil
 	default:
 		return nil, errors.New("the current type is not supported. please feedback through issue")
 	}
