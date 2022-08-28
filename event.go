@@ -1,10 +1,9 @@
 package BeaverBot
 
 import (
-	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/base64"
+	"errors"
 	"fmt"
+	"regexp"
 	"sync"
 	"time"
 )
@@ -47,30 +46,7 @@ type whoSign struct {
 	sign      string
 }
 
-func worker(pool chan whoSign, wg *sync.WaitGroup, id *int) {
-	for signInfo := range pool {
-		for i, handle := range AllHandle {
-			secStr := fmt.Sprintf("%d\n%s", signInfo.timestamp, handle.AppSecret)
-			hmac256 := hmac.New(sha256.New, []byte(handle.AppSecret))
-			hmac256.Write([]byte(secStr))
-			result := hmac256.Sum(nil)
-			sign := base64.StdEncoding.EncodeToString(result)
-			if sign == signInfo.sign {
-				*id = i + 1
-			}
-		}
-		wg.Done()
-	}
-
-}
-
-//func (e *Event)sign(t int64, secret string) string {
-//	secStr := fmt.Sprintf("%d\n%s", t, secret)
-//	hmac256 := hmac.New(sha256.New, []byte(secret))
-//	hmac256.Write([]byte(secStr))
-//	result := hmac256.Sum(nil)
-//	return base64.StdEncoding.EncodeToString(result)
-//}
+// 命令处理器
 func (e *Event) explain(pool *chan whoSign, wg *sync.WaitGroup, id *int) {
 	// 获取当前时间戳(毫秒)
 	now := time.Now()
@@ -87,9 +63,61 @@ func (e *Event) explain(pool *chan whoSign, wg *sync.WaitGroup, id *int) {
 	}
 	wg.Wait()
 	if *id == 0 {
-		fmt.Println("判断失败")
+		fmt.Println("[BeaverBot] 机器人识别失败,或签名无效")
+		return
 	}
 	e.HandleID = *id
 	*id = 0
-	fmt.Println("签名有效,机器人ID为:", e.HandleID)
+	for i := 0; i < len(Tasks); i++ {
+		task := Tasks[i]
+		status := e.filterStart(task)
+		if status == nil {
+			return
+		}
+	}
+}
+
+// 触发器过滤
+func (e *Event) filterStart(task Task) error {
+	for t := 1; t <= len(task.Condition); t++ {
+		//fmt.Println(*task.Condition[t-1].Key.(reflect.TypeOf(task.Condition[t-1].Key))
+		conditionKey, _ := e.typeAsserts(task.Condition[t-1].Key)
+		if t == len(task.Condition) {
+			if task.Condition[t-1].Regex == true {
+				key, _ := regexp.MatchString(task.Condition[t-1].Value, fmt.Sprint(conditionKey))
+				if key {
+					task.Run()
+					return nil
+				}
+			}
+			if fmt.Sprint(conditionKey) == task.Condition[t-1].Value {
+				task.Run()
+				return nil
+			}
+		}
+		if task.Condition[t-1].Regex == true {
+			key, _ := regexp.MatchString(task.Condition[t-1].Value, fmt.Sprint(conditionKey))
+			if key != true {
+				return errors.New("1")
+			}
+		}
+		if fmt.Sprint(conditionKey) != task.Condition[t-1].Value {
+			return errors.New("1")
+		}
+	}
+	return errors.New("1")
+}
+
+// 类型断言
+func (e *Event) typeAsserts(key interface{}) (interface{}, error) {
+	switch key.(type) {
+	case *int64:
+		return *key.(*int64), nil
+	case *string:
+		return *key.(*string), nil
+	case *int32:
+		return *key.(*int32), nil
+	default:
+		return nil, errors.New("the current type is not supported. please feedback through issue")
+	}
 }

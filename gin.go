@@ -1,6 +1,9 @@
 package BeaverBot
 
 import (
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"github.com/gin-gonic/gin"
@@ -57,4 +60,21 @@ func RunBeaverBot(port string, e *Event) {
 	if err != nil {
 		fmt.Printf("gin:%v", err)
 	}
+}
+
+func worker(pool chan whoSign, wg *sync.WaitGroup, id *int) {
+	for signInfo := range pool {
+		for i, handle := range AllHandle {
+			secStr := fmt.Sprintf("%d\n%s", signInfo.timestamp, handle.AppSecret)
+			hmac256 := hmac.New(sha256.New, []byte(handle.AppSecret))
+			hmac256.Write([]byte(secStr))
+			result := hmac256.Sum(nil)
+			sign := base64.StdEncoding.EncodeToString(result)
+			if sign == signInfo.sign {
+				*id = i + 1
+			}
+		}
+		wg.Done()
+	}
+
 }
