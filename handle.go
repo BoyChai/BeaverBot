@@ -31,12 +31,12 @@ func NewHandle(appKey string, appSecret string) *Handle {
 }
 
 // GetID 获取当前命令执行器的id
-func (h Handle) GetID() int {
+func (h *Handle) GetID() int {
 	return h.id
 }
 
 // GetAccessToken 获取token
-func (h Handle) GetAccessToken() (err error) {
+func (h *Handle) GetAccessToken() (err error) {
 	body := make(map[string]interface{})
 	body["appKey"] = h.AppKey
 	body["appSecret"] = h.AppSecret
@@ -65,4 +65,30 @@ func (h Handle) GetAccessToken() (err error) {
 	}
 	h.accessToken = gjson.Get(string(data), "accessToken").String()
 	return nil
+}
+
+//请求函数
+func (h *Handle) req(url string, msg *bytes.Reader) (string, error) {
+	client := &http.Client{}
+
+	req, err := http.NewRequest("POST", url, msg)
+	if err != nil {
+		return "", err
+	}
+
+	req.Header.Set("x-acs-dingtalk-access-token", h.accessToken)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := client.Do(req)
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			fmt.Println(err)
+		}
+	}(resp.Body)
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+	return string(body), nil
 }
