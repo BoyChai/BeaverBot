@@ -332,16 +332,48 @@ func NewActionCard6Msg(text string, title string, buttonTitle1 string, buttonUrl
 	return string(msg)
 }
 
-// 企业内机器人发送消息权限封装
+// SendPrivateMessages 批量发送单聊消息
+func (h *Handle) SendPrivateMessages(robotCode string, msg string, userId []string) (statusCode int, bodyData string, err error) {
+	// 数据拼接
+	body := make(map[string]interface{})
+	body["msgParam"] = msg
+	body["msgKey"] = gjson.Get(msg, "msgType").String()
+	body["userIds"] = userId
+	body["robotCode"] = robotCode
+	bytesData, err := json.Marshal(body)
+	if err != nil {
+		return 0, "", err
+	}
+
+	reader := bytes.NewReader(bytesData)
+
+	return h.req("https://api.dingtalk.com/v1.0/robot/oToMessages/batchSend", reader)
+}
+
+// DeletePrivateMessages 批量撤回单聊消息
+func (h *Handle) DeletePrivateMessages(robotCode string, processQueryKeys []string) (statusCode int, bodyData string, err error) {
+	// 数据拼接
+	body := make(map[string]interface{})
+	body["processQueryKeys"] = processQueryKeys
+	body["robotCode"] = robotCode
+	bytesData, err := json.Marshal(body)
+	if err != nil {
+		return 0, "", err
+	}
+
+	reader := bytes.NewReader(bytesData)
+
+	return h.req("https://api.dingtalk.com/v1.0/robot/otoMessages/batchRecall", reader)
+}
 
 // SendGroupMessages 企业机器人向内部群发消息
-func (h *Handle) SendGroupMessages(msg string, conversationId string) (statusCode int, bodyData string, err error) {
+func (h *Handle) SendGroupMessages(robotCode string, msg string, conversationId string) (statusCode int, bodyData string, err error) {
 	// 数据拼接
 	body := make(map[string]interface{})
 	body["msgParam"] = msg
 	body["msgKey"] = gjson.Get(msg, "msgType").String()
 	body["openConversationId"] = conversationId
-	body["robotCode"] = h.AppKey
+	body["robotCode"] = robotCode
 	bytesData, err := json.Marshal(body)
 	if err != nil {
 		return 0, "", err
@@ -350,4 +382,22 @@ func (h *Handle) SendGroupMessages(msg string, conversationId string) (statusCod
 	reader := bytes.NewReader(bytesData)
 
 	return h.req("https://api.dingtalk.com/v1.0/robot/groupMessages/send", reader)
+}
+
+// DeleteGroupMessages 批量撤回群聊消息
+func (h *Handle) DeleteGroupMessages(robotCode string, processQueryKeys []string, conversationId string) (statusCode int, bodyData string, err error) {
+	// 数据拼接
+	body := make(map[string]interface{})
+	body["processQueryKeys"] = processQueryKeys
+	body["robotCode"] = robotCode
+	body["openConversationId"] = conversationId
+
+	bytesData, err := json.Marshal(body)
+	if err != nil {
+		return 0, "", err
+	}
+
+	reader := bytes.NewReader(bytesData)
+
+	return h.req("https://api.dingtalk.com/v1.0/robot/groupMessages/recall", reader)
 }
