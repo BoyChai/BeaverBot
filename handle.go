@@ -9,6 +9,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	url2 "net/url"
 )
 
 type Handle struct {
@@ -71,14 +72,43 @@ func (h *Handle) getAccessToken() (err error) {
 	return nil
 }
 
-//请求函数
-func (h *Handle) req(url string, msg *bytes.Reader) (statusCode int, bodyData string, err error) {
+//Post请求函数
+func (h *Handle) reqPost(url string, msg *bytes.Reader) (statusCode int, bodyData string, err error) {
 	client := &http.Client{}
 
 	req, err := http.NewRequest("POST", url, msg)
 	if err != nil {
 		return 0, "", err
 	}
+
+	req.Header.Set("x-acs-dingtalk-access-token", h.accessToken)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := client.Do(req)
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			fmt.Println(err)
+		}
+	}(resp.Body)
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return 0, "", err
+	}
+
+	return resp.StatusCode, string(body), nil
+}
+
+//Get请求函数
+func (h *Handle) reqGet(url string, msg url2.Values) (statusCode int, bodyData string, err error) {
+	client := &http.Client{}
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return 0, "", err
+	}
+
+	req.URL.RawQuery = msg.Encode()
 
 	req.Header.Set("x-acs-dingtalk-access-token", h.accessToken)
 	req.Header.Set("Content-Type", "application/json")
@@ -347,7 +377,7 @@ func (h *Handle) SendPrivateMessages(robotCode string, msg string, userId []stri
 
 	reader := bytes.NewReader(bytesData)
 
-	return h.req("https://api.dingtalk.com/v1.0/robot/oToMessages/batchSend", reader)
+	return h.reqPost("https://api.dingtalk.com/v1.0/robot/oToMessages/batchSend", reader)
 }
 
 // DeletePrivateMessages 批量撤回单聊消息
@@ -363,7 +393,17 @@ func (h *Handle) DeletePrivateMessages(robotCode string, processQueryKeys []stri
 
 	reader := bytes.NewReader(bytesData)
 
-	return h.req("https://api.dingtalk.com/v1.0/robot/otoMessages/batchRecall", reader)
+	return h.reqPost("https://api.dingtalk.com/v1.0/robot/otoMessages/batchRecall", reader)
+}
+
+// QueryPrivateMessages 批量查询机器人单单聊消息是否已读
+func (h *Handle) QueryPrivateMessages(robotCode string, processQueryKeys string) (statusCode int, bodyData string, err error) {
+	// 数据拼接
+	reader := make(url2.Values)
+	reader.Add("robotCode", robotCode)
+	reader.Add("processQueryKey", processQueryKeys)
+
+	return h.reqGet("https://api.dingtalk.com/v1.0/robot/oToMessages/readStatus", reader)
 }
 
 // SendGroupMessages 企业机器人向内部群发消息
@@ -381,7 +421,7 @@ func (h *Handle) SendGroupMessages(robotCode string, msg string, conversationId 
 
 	reader := bytes.NewReader(bytesData)
 
-	return h.req("https://api.dingtalk.com/v1.0/robot/groupMessages/send", reader)
+	return h.reqPost("https://api.dingtalk.com/v1.0/robot/groupMessages/send", reader)
 }
 
 // DeleteGroupMessages 批量撤回群聊消息
@@ -399,5 +439,25 @@ func (h *Handle) DeleteGroupMessages(robotCode string, processQueryKeys []string
 
 	reader := bytes.NewReader(bytesData)
 
-	return h.req("https://api.dingtalk.com/v1.0/robot/groupMessages/recall", reader)
+	return h.reqPost("https://api.dingtalk.com/v1.0/robot/groupMessages/recall", reader)
+}
+
+// QueryGroupMessages 查询企业机器人群聊消息用户已读状态
+func (h *Handle) QueryGroupMessages(robotCode string, conversationId string, processQueryKey string, maxResults string, nextToken string) (statusCode int, bodyData string, err error) {
+	// 数据拼接
+	body := make(map[string]interface{})
+	body["openConversationId"] = conversationId
+	body["processQueryKey"] = processQueryKey
+	body["robotCode"] = robotCode
+	body["maxResults"] = maxResults
+	body["nextToken"] = nextToken
+
+	bytesData, err := json.Marshal(body)
+	if err != nil {
+		return 0, "", err
+	}
+
+	reader := bytes.NewReader(bytesData)
+
+	return h.reqPost("https://api.dingtalk.com/v1.0/robot/groupMessages/query", reader)
 }
