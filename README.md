@@ -1,3 +1,4 @@
+# 功能陆续迁移到 [CoralBot](https://github.com/BoyChai/CoralBot)
 # BeaverBot
 
 ## 概述
